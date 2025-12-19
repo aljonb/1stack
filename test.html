@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PocketBase SDK Test</title>
+  <style>
+    * { font-family: system-ui, sans-serif; }
+    body { max-width: 800px; margin: 2rem auto; padding: 0 1rem; }
+    .card { border: 1px solid #ddd; padding: 1rem; margin: 1rem 0; border-radius: 8px; }
+    button { padding: 0.5rem 1rem; margin: 0.25rem; cursor: pointer; }
+    pre { background: #f5f5f5; padding: 1rem; overflow-x: auto; border-radius: 4px; }
+    input { padding: 0.5rem; margin: 0.25rem; }
+    .success { color: green; }
+    .error { color: red; }
+    #log { height: 300px; overflow-y: auto; font-family: monospace; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <h1>🗄️ PocketBase SDK Test</h1>
+  
+  <div class="card">
+    <h2>Connection</h2>
+    <input type="text" id="baseUrl" value="http://127.0.0.1:8090" placeholder="PocketBase URL">
+    <button onclick="connect()">Connect</button>
+    <button onclick="checkHealth()">Health Check</button>
+    <button onclick="checkCollections()">Check 'users' Collection</button>
+    <p id="connectionStatus"></p>
+  </div>
+
+  <div class="card">
+    <h2>Authentication</h2>
+    <input type="email" id="email" placeholder="Email" value="test@test.com">
+    <input type="password" id="password" placeholder="Password" value="12345678">
+    <br>
+    <button onclick="register()">Register (Create User)</button>
+    <button onclick="login()">Login</button>
+    <button onclick="logout()">Logout</button>
+    <p id="authStatus"></p>
+  </div>
+
+  <div class="card">
+    <h2>Records (Collection: <input type="text" id="collection" value="posts" style="width:100px">)</h2>
+    <button onclick="listRecords()">List</button>
+    <button onclick="createRecord()">Create Test</button>
+    <button onclick="subscribeRealtime()">Subscribe Realtime</button>
+    <button onclick="unsubscribeRealtime()">Unsubscribe</button>
+  </div>
+
+  <div class="card">
+    <h2>Log</h2>
+    <button onclick="clearLog()">Clear</button>
+    <pre id="log"></pre>
+  </div>
+
+  <script src="./dist/pocketbase.umd.js"></script>
+  <script>
+    let pb = null;
+
+    function log(msg, type = 'info') {
+      const el = document.getElementById('log');
+      const time = new Date().toLocaleTimeString();
+      const color = type === 'error' ? 'red' : type === 'success' ? 'green' : 'inherit';
+      el.innerHTML += `<div style="color:${color}">[${time}] ${msg}</div>`;
+      el.scrollTop = el.scrollHeight;
+    }
+
+    function clearLog() {
+      document.getElementById('log').innerHTML = '';
+    }
+
+    function connect() {
+      const url = document.getElementById('baseUrl').value;
+      pb = new PocketBase.default(url);
+      log(`Connected to ${url}`, 'success');
+      document.getElementById('connectionStatus').innerHTML = `<span class="success">✓ Connected</span>`;
+      
+      // Listen for auth changes
+      pb.authStore.onChange((token, record) => {
+        log(`Auth changed: ${record ? record.email : 'logged out'}`);
+        updateAuthStatus();
+      });
+    }
+
+    function updateAuthStatus() {
+      const el = document.getElementById('authStatus');
+      if (pb?.authStore?.record) {
+        el.innerHTML = `<span class="success">✓ Logged in as ${pb.authStore.record.email}</span>`;
+      } else {
+        el.innerHTML = `<span>Not authenticated</span>`;
+      }
+    }
+
+    async function checkHealth() {
+      if (!pb) return log('Not connected', 'error');
+      try {
+        const health = await pb.health.check();
+        log(`Health: ${JSON.stringify(health)}`, 'success');
+        log('PocketBase is running!', 'success');
+      } catch (e) {
+        log(`Health check failed: ${e.message}`, 'error');
+        log('Make sure PocketBase is running at the specified URL', 'error');
+        if (e.originalError) {
+          log(`Network error: ${e.originalError.message}`, 'error');
+        }
+      }
+    }
+    
+    async function checkCollections() {
+      if (!pb) return log('Not connected', 'error');
+      try {
+        // This requires admin auth, so we'll just try to access users collection
+        const authMethods = await pb.collection('users').listAuthMethods();
+        log(`'users' collection exists!`, 'success');
+        log(`Auth methods: ${JSON.stringify(authMethods)}`, 'info');
+      } catch (e) {
+        if (e.status === 404) {
+          log(`'users' collection NOT FOUND!`, 'error');
+          log(`Go to PocketBase admin (${pb.baseURL}/_/) and create a 'users' collection with type 'auth'`, 'error');
+        } else {
+          log(`Check failed: ${e.message}`, 'error');
+        }
+      }
+    }
+
+    async function register() {
+      if (!pb) return log('Not connected', 'error');
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      
+      if (!email || !password) {
+        return log('Email and password are required', 'error');
+      }
+      
+      try {
+        const user = await pb.collection('users').create({
+          email: email,
+          password: password,
+          passwordConfirm: password,
+        });
+        log(`Registered successfully: ${user.email} (id: ${user.id})`, 'success');
+        log('You can now login with these credentials', 'info');
+      } catch (e) {
+        log(`Register failed: ${e.message}`, 'error');
+        if (e.response) {
+          log(`Details: ${JSON.stringify(e.response)}`, 'error');
+        }
+      }
+    }
+
+    async function login() {
+      if (!pb) return log('Not connected', 'error');
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      
+      if (!email || !password) {
+        return log('Email and password are required', 'error');
+      }
+      
+      try {
+        const auth = await pb.collection('users').authWithPassword(email, password);
+        log(`Logged in: ${auth.record.email}`, 'success');
+      } catch (e) {
+        log(`Login failed: ${e.message}`, 'error');
+        if (e.response) {
+          log(`Details: ${JSON.stringify(e.response)}`, 'error');
+        }
+      }
+    }
+
+    function logout() {
+      if (!pb) return log('Not connected', 'error');
+      pb.authStore.clear();
+      log('Logged out', 'success');
+    }
+
+    async function listRecords() {
+      if (!pb) return log('Not connected', 'error');
+      const collection = document.getElementById('collection').value;
+      try {
+        const records = await pb.collection(collection).getList(1, 10);
+        log(`Found ${records.totalItems} records:`, 'success');
+        records.items.forEach(r => log(`  - ${r.id}: ${JSON.stringify(r)}`));
+      } catch (e) {
+        log(`List failed: ${e.message}`, 'error');
+      }
+    }
+
+    async function createRecord() {
+      if (!pb) return log('Not connected', 'error');
+      const collection = document.getElementById('collection').value;
+      try {
+        const record = await pb.collection(collection).create({
+          title: 'Test ' + Date.now(),
+          content: 'Created from SDK test page',
+        });
+        log(`Created: ${JSON.stringify(record)}`, 'success');
+      } catch (e) {
+        log(`Create failed: ${e.message}`, 'error');
+      }
+    }
+
+    let unsubscribe = null;
+    async function subscribeRealtime() {
+      if (!pb) return log('Not connected', 'error');
+      const collection = document.getElementById('collection').value;
+      try {
+        unsubscribe = await pb.collection(collection).subscribe('*', (e) => {
+          log(`Realtime [${e.action}]: ${JSON.stringify(e.record)}`, 'success');
+        });
+        log(`Subscribed to ${collection}/*`, 'success');
+      } catch (e) {
+        log(`Subscribe failed: ${e.message}`, 'error');
+      }
+    }
+
+    async function unsubscribeRealtime() {
+      if (unsubscribe) {
+        await unsubscribe();
+        unsubscribe = null;
+        log('Unsubscribed', 'success');
+      }
+    }
+
+    // Auto-connect on load
+    window.onload = () => connect();
+  </script>
+</body>
+</html>

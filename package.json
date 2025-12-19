@@ -1,0 +1,64 @@
+{
+  "name": "pocketbase",
+  "version": "0.25.0",
+  "description": "Official JavaScript SDK for PocketBase",
+  "author": "PocketBase",
+  "license": "MIT",
+  "main": "./dist/pocketbase.cjs.js",
+  "module": "./dist/pocketbase.es.mjs",
+  "browser": "./dist/pocketbase.es.mjs",
+  "types": "./dist/pocketbase.d.ts",
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/pocketbase.es.mjs",
+      "require": "./dist/pocketbase.cjs.js",
+      "types": "./dist/pocketbase.d.ts"
+    },
+    "./cjs": {
+      "require": "./dist/pocketbase.cjs.js",
+      "types": "./dist/pocketbase.d.ts"
+    },
+    "./svelte": {
+      "import": "./dist/pocketbase-svelte.es.mjs",
+      "types": "./dist/pocketbase-svelte.d.ts",
+      "svelte": "./dist/pocketbase-svelte.es.mjs"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "rollup -c rollup.config.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "format": "prettier --write 'src/**/*.ts'",
+    "lint": "eslint 'src/**/*.ts'"
+  },
+  "devDependencies": {
+    "@rollup/plugin-node-resolve": "^15.2.3",
+    "@rollup/plugin-terser": "^0.4.4",
+    "@rollup/plugin-typescript": "^11.1.6",
+    "@types/node": "^20.11.0",
+    "prettier": "^3.2.4",
+    "rollup": "^4.9.6",
+    "rollup-plugin-dts": "^6.1.0",
+    "tslib": "^2.6.2",
+    "typescript": "^5.3.3",
+    "vitest": "^1.2.1"
+  },
+  "keywords": [
+    "pocketbase",
+    "sdk",
+    "javascript",
+    "typescript",
+    "api",
+    "backend",
+    "baas"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/pocketbase/js-sdk"
+  },
+  "homepage": "https://pocketbase.io"
+}
